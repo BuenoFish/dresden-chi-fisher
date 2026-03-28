@@ -153,34 +153,36 @@ Jede Zelle = Anzahl der Beobachtungen in dieser Kombination.
 </div>
 """, unsafe_allow_html=True)
 
-# Tabelle als data_editor
-if "table_data" not in st.session_state or \
-   st.session_state.get("table_shape") != (n_rows, n_cols):
-    st.session_state.table_data = pd.DataFrame(
-        np.zeros((n_rows, n_cols), dtype=int),
-        index=row_labels,
-        columns=col_labels
-    )
-    st.session_state.table_shape = (n_rows, n_cols)
+# Jede Zelle als eigenes number_input – zuverlässig im Session State
+table = np.zeros((n_rows, n_cols), dtype=int)
 
-# Spalten-Config
-col_config = {col: st.column_config.NumberColumn(col, min_value=0, step=1, format="%d")
-              for col in col_labels}
+# Spaltenheader
+header_cols = st.columns([1] + [2] * n_cols)
+header_cols[0].markdown("")
+for j, cl in enumerate(col_labels):
+    header_cols[j+1].markdown(
+        f"<div style='text-align:center;font-weight:600;font-family:IBM Plex Mono,monospace;"
+        f"font-size:13px;color:#555;padding-bottom:4px;'>{cl}</div>",
+        unsafe_allow_html=True)
 
-edited = st.data_editor(
-    pd.DataFrame(
-        st.session_state.table_data.values,
-        index=row_labels,
-        columns=col_labels
-    ),
-    column_config=col_config,
-    use_container_width=True,
-    hide_index=False,
-    key="table_editor"
-)
-st.session_state.table_data = edited
+# Reihen mit number_input
+for i in range(n_rows):
+    row_cols = st.columns([1] + [2] * n_cols)
+    row_cols[0].markdown(
+        f"<div style='display:flex;align-items:center;height:50px;"
+        f"font-weight:600;font-family:IBM Plex Mono,monospace;font-size:13px;color:#555;'>"
+        f"{row_labels[i]}</div>",
+        unsafe_allow_html=True)
+    for j in range(n_cols):
+        key = f"cell_{n_rows}_{n_cols}_{i}_{j}"
+        val = row_cols[j+1].number_input(
+            f"{row_labels[i]} x {col_labels[j]}",
+            min_value=0, value=0, step=1,
+            key=key,
+            label_visibility="collapsed"
+        )
+        table[i, j] = int(val)
 
-table = edited.values.astype(int)
 n_total = table.sum()
 
 # Randsummen anzeigen
