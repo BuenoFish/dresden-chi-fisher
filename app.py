@@ -46,38 +46,83 @@ st.markdown("""
 # ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 def fisher_exact_rxc(table):
-    """Fisher's exakter Test für RxC Tabellen via Netzwerk-Algorithmus."""
+    """
+    Fisher's exakter Test fuer RxC Tabellen.
+    2x2: scipy exakt. 2xC / Rx2: vollstaendige Enumeration (exakt).
+    RxC mit grossen N: Monte Carlo (200.000 Permutationen).
+    """
+    from itertools import product as iproduct
+    from math import lgamma
     table = np.array(table, dtype=int)
     r, c = table.shape
+
     if r == 2 and c == 2:
         _, p = fisher_exact(table)
-        return p
-    # Für RxC: Monte-Carlo Simulation
-    from scipy.stats import chi2_contingency
-    # Verwende exakten Test via permutation
-    n_simulations = 100000
+        return p, "exakt (2x2)"
+
     row_sums = table.sum(axis=1)
     col_sums = table.sum(axis=0)
-    n_total = table.sum()
+    n = int(table.sum())
 
-    # Beobachtete Teststatistik
-    chi2_obs, _, _, expected = chi2_contingency(table, correction=False)
+    def log_prob(t):
+        lp = 0
+        for i in range(r): lp += lgamma(row_sums[i] + 1)
+        for j in range(c): lp += lgamma(col_sums[j] + 1)
+        lp -= lgamma(n + 1)
+        for i in range(r):
+            for j in range(c):
+                lp -= lgamma(int(t[i, j]) + 1)
+        return lp
 
-    # Monte Carlo
-    count_extreme = 0
-    rng = np.random.default_rng(42)
-    for _ in range(n_simulations):
-        # Zufällige Tabelle mit gleichen Randsummen
-        sim = rng.multinomial(n_total, (expected / n_total).ravel()).reshape(r, c)
-        if sim.sum() == 0:
-            continue
-        try:
-            chi2_sim, _, _, _ = chi2_contingency(sim, correction=False)
-            if chi2_sim >= chi2_obs:
-                count_extreme += 1
-        except Exception:
-            pass
-    return count_extreme / n_simulations
+    log_p_obs = log_prob(table)
+
+    # Monte Carlo fuer grosse/komplexe Tabellen
+    use_mc = (r >= 3 and c >= 3 and n > 30) or n > 200
+    if use_mc:
+        chi2_obs, _, _, expected = chi2_contingency(table, correction=False)
+        n_sim = 200000
+        rng = np.random.default_rng(42)
+        count = 0
+        for _ in range(n_sim):
+            sim = rng.multinomial(n, (expected / n).ravel()).reshape(r, c)
+            try:
+                chi2_sim, _, _, _ = chi2_contingency(sim, correction=False)
+                if chi2_sim >= chi2_obs: count += 1
+            except Exception: pass
+        return count / n_sim, "Monte Carlo (200.000)"
+
+    # Exakte Enumeration via vollstaendige Aufzaehlung
+    def enumerate_tables(rs, cs):
+        def fill(row, rem_cols, rem_rs, current):
+            if row == r - 1:
+                last = rem_cols.copy()
+                if np.all(last >= 0) and last.sum() == rem_rs[row]:
+                    yield np.vstack(current + [last])
+                return
+            ranges = [range(int(min(rem_cols[j], rem_rs[row])) + 1) for j in range(c)]
+            for combo in iproduct(*ranges):
+                arr = np.array(combo)
+                if arr.sum() != rem_rs[row]: continue
+                new_rem = rem_cols - arr
+                if np.any(new_rem < 0): continue
+                yield from fill(row + 1, new_rem, rem_rs, current + [arr])
+        yield from fill(0, cs.copy(), rs, [])
+
+    def logsumexp(vals):
+        if not vals: return -np.inf
+        m = max(vals)
+        return m + np.log(sum(np.exp(v - m) for v in vals))
+
+    log_all, log_extreme = [], []
+    for t in enumerate_tables(row_sums, col_sums):
+        lp = log_prob(t)
+        log_all.append(lp)
+        if lp <= log_p_obs + 1e-10:
+            log_extreme.append(lp)
+
+    if not log_all: return 1.0, "exakt"
+    p = float(np.exp(logsumexp(log_extreme) - logsumexp(log_all)))
+    return min(p, 1.0), "exakt"
 
 def expected_counts(table):
     table = np.array(table, dtype=float)
@@ -264,9 +309,9 @@ if st.session_state.get("run_analysis"):
 
     # Fisher
     if run_fisher:
-        with st.spinner("Fisher's Test wird berechnet..."):
-            p_fisher = fisher_exact_rxc(table)
-        results["fisher"] = {"p": p_fisher}
+        with st.spinner("Fisher\'s Test wird berechnet..."):
+            p_fisher, fisher_method = fisher_exact_rxc(table)
+        results["fisher"] = {"p": p_fisher, "method": fisher_method}
 
     # Cramér's V
     chi2_for_v = results["chi2"]["chi2"] if "chi2" in results else \
@@ -287,7 +332,8 @@ if st.session_state.get("run_analysis"):
         ]
     if "fisher" in results:
         p_f = results["fisher"]["p"]
-        cards.append(("p-Wert (Fisher)", f"{p_f:.4f}" if p_f >= 0.0001 else "< 0.0001"))
+        fm = results["fisher"].get("method", "exakt")
+        cards.append((f"p-Wert Fisher ({fm})", f"{p_f:.4f}" if p_f >= 0.0001 else "< 0.0001"))
     cards += [
         ("Cramér's V", f"{v:.4f}"),
         ("Effektstärke", effect),
