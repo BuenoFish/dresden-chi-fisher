@@ -9,7 +9,7 @@ from scipy.stats import chi2 as chi2_dist
 from itertools import product
 from io import BytesIO
 
-st.set_page_config(page_title="Kontingenztest", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Kontingenztest", page_icon="🚣‍♂️", layout="wide")
 
 st.markdown("""
 <style>
@@ -46,7 +46,7 @@ try:
     st.markdown(f"""
 <div class="header-box" style="display:flex; align-items:stretch; justify-content:space-between; padding:0; overflow:hidden; border-radius:4px; margin:0 0 2rem 0;">
     <div style="padding:2rem 2.5rem; flex:1;">
-        <h1 style="font-size:1.8rem; margin:0 0 0.3rem 0; color:#f5f4f0;">📊 Kontingenztest</h1>
+        <h1 style="font-size:1.8rem; margin:0 0 0.3rem 0; color:#f5f4f0;">🚣‍♂️ Kontingenztests</h1>
         <p style="margin:0; color:#aaa; font-size:0.9rem; font-family:'IBM Plex Mono',monospace;">
             Chi-Quadrat-Test · Fisher's Exakter Test · bis 5×5 Tabellen
         </p>
