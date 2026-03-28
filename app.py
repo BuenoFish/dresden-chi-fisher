@@ -1,4 +1,5 @@
 import streamlit as st
+import base64
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -36,7 +37,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
+def img_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+try:
+    img_b64 = img_to_base64("frauenkirche_flach.jpg")
+    st.markdown(f"""
+<div class="header-box" style="display:flex; align-items:stretch; justify-content:space-between; padding:0; overflow:hidden; border-radius:4px; margin:0 0 2rem 0;">
+    <div style="padding:2rem 2.5rem; flex:1;">
+        <h1 style="font-size:1.8rem; margin:0 0 0.3rem 0; color:#f5f4f0;">📊 Kontingenztest</h1>
+        <p style="margin:0; color:#aaa; font-size:0.9rem; font-family:'IBM Plex Mono',monospace;">
+            Chi-Quadrat-Test · Fisher's Exakter Test · bis 5×5 Tabellen
+        </p>
+    </div>
+    <div style="width:350px; flex-shrink:0; position:relative; line-height:0;">
+        <img src="data:image/jpeg;base64,{img_b64}"
+             style="width:100%; height:100%; object-fit:cover; object-position:center; display:block;">
+        <div style="position:absolute; top:0; left:0; width:100%; height:100%;
+            background: linear-gradient(to right, #1a1a1a 0%, transparent 60%);"></div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+except FileNotFoundError:
+    st.markdown("""
 <div class="header-box">
     <h1>📊 Kontingenztest</h1>
     <p>Chi-Quadrat-Test · Fisher's Exakter Test · bis 5×5 Tabellen</p>
